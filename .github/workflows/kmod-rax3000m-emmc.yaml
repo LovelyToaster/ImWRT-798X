@@ -1,0 +1,84 @@
+name: Build specified kmod
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo_url:
+        description: '源仓库 URL'
+        default: 'https://github.com/padavanonly/immortalwrt-mt798x-24.10'
+      repo_branch:
+        description: '源仓库分支'
+        default: 'openwrt-24.10-6.6'
+      commit_hash:
+        description: '指定 commit 哈希(可选)'
+        required: false
+      kmod_name:
+        description: '要编译的 kmod 名称'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Show inputs
+      run: |
+        echo "repo_url=${{ github.event.inputs.repo_url }}"
+        echo "repo_branch=${{ github.event.inputs.repo_branch }}"
+        echo "commit_hash=${{ github.event.inputs.commit_hash }}"
+        echo "kmod_name=${{ github.event.inputs.kmod_name }}"
+
+    - name: Clone source repository
+      run: |
+        git clone --branch "${{ github.event.inputs.repo_branch }}" --depth=1 "${{ github.event.inputs.repo_url }}" openwrt
+        cd openwrt
+        if [ -n "${{ github.event.inputs.commit_hash }}" ]; then
+          echo "Checking out to commit ${{ github.event.inputs.commit_hash }}"
+          git fetch --depth=1 origin ${{ github.event.inputs.commit_hash }}
+          git checkout ${{ github.event.inputs.commit_hash }}
+        fi
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libncurses5-dev gawk git \
+          subversion libssl-dev gettext unzip file python3
+
+    - name: Prepare feeds
+      working-directory: ./openwrt
+      run: |
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: Generate .config
+      working-directory: ./openwrt
+      run: |
+        echo "CONFIG_TARGET_mediatek=y" > .config
+        echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
+        echo "CONFIG_TARGET_mediatek_filogic_DEVICE_cmcc_rax3000m-emmc=y" >> .config
+        echo "CONFIG_PACKAGE_${{ github.event.inputs.kmod_name }}=m" >> .config
+
+    - name: Defconfig
+      working-directory: ./openwrt
+      run: make defconfig
+
+    - name: Build Linux kernel
+      working-directory: ./openwrt
+      run: make target/linux/compile V=s -j$(nproc)
+
+    - name: Build specified kmod
+      working-directory: ./openwrt
+      run: |
+        make package/kernel/${{ github.event.inputs.kmod_name }}/compile V=s -j$(nproc)
+
+    - name: Find and copy kmod ipk
+      working-directory: ./openwrt
+      run: |
+        mkdir -p output
+        find bin/targets -name "${{ github.event.inputs.kmod_name }}_*.ipk" -exec cp {} output/ \;
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ github.event.inputs.kmod_name }}
+        path: openwrt/output/

@@ -70,6 +70,10 @@ jobs:
       working-directory: ./openwrt
       run: make defconfig
 
+    - name: Download all sources
+      working-directory: ./openwrt
+      run: make download -j8
+
     - name: Build Linux kernel
       working-directory: ./openwrt
       run: make target/linux/compile V=s -j$(nproc)

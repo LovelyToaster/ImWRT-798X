@@ -40,9 +40,17 @@ jobs:
 
     - name: Install build dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential libncurses5-dev gawk git \
-          subversion libssl-dev gettext unzip file python3
+        sudo apt-get update -y
+        sudo apt-get install -y \
+          build-essential ccache cmake curl git gawk gcc-multilib g++-multilib \
+          libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev \
+          libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool \
+          ninja-build python3 python3-pip python3-ply python3-docutils python3-pyelftools \
+          rsync unzip vim wget zlib1g-dev squashfs-tools device-tree-compiler zstd \
+          binutils bison flex gettext p7zip p7zip-full patch pkgconf \
+          autopoint asciidoc xmlto texinfo
+        sudo apt-get autoremove --purge -y
+        sudo apt-get clean
 
     - name: Prepare feeds
       working-directory: ./openwrt
